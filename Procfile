@@ -1,0 +1,1 @@
+worker: python woocommerce_orders.py
