@@ -8,7 +8,7 @@ from google_sheets_helper import google_sheet_connection
 load_dotenv()
 
 # CONFIG
-MAX_ORDERS = 10000  # Set to None to fetch all orders, or specify a number like 1000
+MAX_ORDERS = None  # Set to None to fetch all orders, or specify a number like 1000
 ORDERS_PER_PAGE = 100  # WooCommerce allows up to 100 per request
 
 # WooCommerce API credentials
