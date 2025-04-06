@@ -1,7 +1,11 @@
+from dotenv import load_dotenv
+import os
 import requests
 import pandas as pd
 import time
 from google_sheets_helper import google_sheet_connection
+
+load_dotenv()
 
 # CONFIG
 MAX_ORDERS = 100  # Set to None to fetch all orders, or specify a number like 1000
@@ -9,8 +13,8 @@ ORDERS_PER_PAGE = 100  # WooCommerce allows up to 100 per request
 
 # WooCommerce API credentials
 order_url = "https://getpetermd.com/wp-json/wc/v3/orders"
-consumer_key = "ck_5840ed9a9e7d0c211f8a994899e671fe18e637c5"
-consumer_secret = "cs_6ebe988c97af09f589d562d14af4851e84c3ead7"
+consumer_key = os.getenv("CONSUMER_KEY")
+consumer_secret = os.getenv("CONSUMER_SECRET")
 
 headers = {"User-Agent": "Mozilla/5.0"}
 params = {
