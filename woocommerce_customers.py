@@ -33,7 +33,7 @@ orders_df['Total Amount'] = pd.to_numeric(orders_df['Total Amount'], errors='coe
 orders_df['Customer ID'] = orders_df['Customer ID'].fillna("0")
 orders_df['Customer ID'] = orders_df['Customer ID'].astype(str)
 orders_df['Email'] = orders_df['Email'].str.strip().str.lower()
-orders_df['Date Created'] = pd.to_datetime(orders_df['Date Created'], format='%d/%m/%Y %H:%M:%S', errors='coerce')
+orders_df['Date Created'] = pd.to_datetime(orders_df['Date Created'], errors='coerce')
 orders_df['Discount Total'] = pd.to_numeric(orders_df['Total Discount'], errors='coerce').fillna(0)
 
 # Registered customers
@@ -66,6 +66,7 @@ guest_summary = guest_summary[['Email', 'ID', 'First Order Date', 'Last Order Da
 final_df = pd.concat([reg_summary, guest_summary], ignore_index=True)
 final_df = final_df.fillna("")
 final_df = final_df[['Email', 'ID', 'First Order Date', 'Last Order Date', 'Name', 'Total Orders', 'Amount Spent', 'Total Discount']]
+final_df = final_df.sort_values(by='First Order Date')
 
 # Upload to Google Sheets
 print("\nUploading customer summary to Google Sheets...")
@@ -79,13 +80,13 @@ sheet_service.spreadsheets().values().clear(
 # Upload in chunks
 def split_dataframe(df, chunk_size):
     for i in range(0, df.shape[0], chunk_size):
-        yield df.iloc[i:i + chunk_size]
+        yield df.iloc[i:i + chunk_size].copy()
 
 for i, chunk in enumerate(split_dataframe(final_df, 1000)):
     chunk['First Order Date'] = pd.to_datetime(chunk['First Order Date'], errors='coerce')
     chunk['Last Order Date'] = pd.to_datetime(chunk['Last Order Date'], errors='coerce')
-    chunk['First Order Date'] = chunk['First Order Date'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("")
-    chunk['Last Order Date'] = chunk['Last Order Date'].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("")
+    chunk['First Order Date'] = chunk['First Order Date'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
+    chunk['Last Order Date'] = chunk['Last Order Date'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notnull(x) else "")
     values = chunk.astype(str).values.tolist()
 
     range_start = f"{customers_sheet}!A2"

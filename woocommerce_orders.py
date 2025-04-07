@@ -8,11 +8,12 @@ from google_sheets_helper import google_sheet_connection
 load_dotenv()
 
 # CONFIG
-MAX_ORDERS = None  # Set to None to fetch all orders, or specify a number like 1000
+MAX_ORDERS = 100  # Set to None to fetch all orders, or specify a number like 1000
 ORDERS_PER_PAGE = 100  # WooCommerce allows up to 100 per request
 
 # WooCommerce API credentials
 order_url = "https://getpetermd.com/wp-json/wc/v3/orders"
+product_url = "https://getpetermd.com/wp-json/wc/v3/products"
 consumer_key = os.getenv("CONSUMER_KEY")
 consumer_secret = os.getenv("CONSUMER_SECRET")
 
@@ -24,6 +25,20 @@ params = {
     'orderby': 'date',
     'order': 'desc'
 }
+
+# Fetch product categories
+product_categories = {}
+response = requests.get(product_url, params={'consumer_key': consumer_key, 'consumer_secret': consumer_secret})
+if response.status_code == 200:
+    products = response.json()
+    for i, product in enumerate(products):
+        product_id = product.get('id')
+        categories = product.get('categories', [])
+        product_categories[product_id] = ", ".join([cat.get('name', '') for cat in categories])
+        print(f"Product ID: {product_id}, Categories: {product_categories[product_id]}")  # Debug output
+        if (i + 1) % 100 == 0:
+            print("Cooling down to avoid category API rate limit...")
+            time.sleep(10)
 
 start_time = time.time()
 print("Fetching orders...")
@@ -98,6 +113,7 @@ for order in all_orders:
             'Email': order.get('billing', {}).get('email'),
             'Product ID': item.get('product_id'),
             'Product Name': item.get('name'),
+            'Category': product_categories.get(item.get('product_id'), ""),
             'Total Amount': order.get('total'),
             'Total Discount': order.get('discount_total'),
             'Payment Method': order.get('payment_method'),
@@ -109,26 +125,29 @@ orders_df = pd.DataFrame(expanded_orders)
 orders_df['Date Created'] = pd.to_datetime(orders_df['Date Created'], errors='coerce')
 orders_df = orders_df.sort_values(by='Date Created', ascending=True)
 
+print(orders_df)
+
+orders_df.to_csv("orders_export.csv", index=False)
+
 # Upload to Google Sheets
 sheet_service = google_sheet_connection()
 sheet_id = "1AhF-dqocc3s362-7pARTWWDyw_SYTWrFD2gVW4eaJZw"
 sheet_name = "Orders"
 
-def split_dataframe(df, chunk_size):
-    for i in range(0, df.shape[0], chunk_size):
-        yield df.iloc[i:i + chunk_size]
+# Clear existing data below headers
+sheet_service.spreadsheets().values().clear(
+    spreadsheetId=sheet_id,
+    range=f"{sheet_name}!A2:Z"
+).execute()
 
-print("\nUploading to Google Sheets...")
-for i, chunk in enumerate(split_dataframe(orders_df, 1000)):
-    values = chunk.fillna("").astype(str).values.tolist()
-    range_start = f"{sheet_name}!A2"
-    sheet_service.spreadsheets().values().append(
-        spreadsheetId=sheet_id,
-        range=range_start,
-        valueInputOption="USER_ENTERED",
-        insertDataOption="INSERT_ROWS",
-        body={"values": values}
-    ).execute()
-    print(f"Uploaded {len(chunk)} records (batch {i+1})")
+values = orders_df.fillna("").astype(str).values.tolist()
+range_all = f"{sheet_name}!A2"
+sheet_service.spreadsheets().values().update(
+    spreadsheetId=sheet_id,
+    range=range_all,
+    valueInputOption="USER_ENTERED",
+    body={"values": values}
+).execute()
+print(f"Uploaded {len(values)} records to Google Sheets.")
 
 print(f"\nDone. Total orders uploaded: {len(orders_df)} in {time.time() - start_time:.2f} seconds.")
